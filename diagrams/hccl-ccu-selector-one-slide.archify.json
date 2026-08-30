@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "HCCL CCU算子选择路线图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1240, 700]
+  },
+  "lanes": [
+    { "id": "entry", "label": "入口与回退" },
+    { "id": "routing", "label": "拓扑与能力分流" },
+    { "id": "execution", "label": "执行族（Executor／Template）" }
+  ],
+  "phases": [
+    { "id": "mode", "label": "CCU模式门槛", "fromCol": 0, "toCol": 1 },
+    { "id": "shape", "label": "拓扑与算子", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "result", "label": "执行路径", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["ccu_input", "ccu_ms_gate", "ccu_sched_gate", "ccu_shape", "ccu_mesh"],
+  "nodes": [
+    { "id": "ccu_input", "lane": "entry", "col": 0, "type": "external", "label": "CCU请求", "sublabel": "Op、拓扑、数据、执行配置", "width": 132 },
+    { "id": "ccu_ms_gate", "lane": "entry", "col": 1, "type": "security", "label": "CCU_MS可覆盖？", "sublabel": "单层／类型／strict", "width": 120 },
+    { "id": "ccu_ms_out", "lane": "routing", "col": 2, "type": "cloud", "label": "CCU_MS路径", "sublabel": "Mesh／2Die／Mesh+NHR", "width": 120 },
+    { "id": "ccu_sched_gate", "lane": "entry", "col": 2, "type": "security", "label": "转CCU_SCHED", "sublabel": "≤2层／无UbRtp", "width": 120 },
+    { "id": "ccu_fallback", "lane": "entry", "col": 4, "type": "messagebus", "label": "不匹配：回退", "sublabel": "CCU_FAIL→AIV或AI_CPU", "width": 142 },
+    { "id": "ccu_shape", "lane": "routing", "col": 3, "type": "backend", "label": "拓扑／算子分流", "sublabel": "Mesh、CLOS、混合、A2A", "width": 140 },
+    { "id": "ccu_mesh", "lane": "execution", "col": 4, "type": "cloud", "label": "Mesh类", "sublabel": "Sole／2Die／Sequence", "width": 120 },
+    { "id": "ccu_nhr", "lane": "execution", "col": 5, "type": "cloud", "label": "NHR类", "sublabel": "CLOS／退化层次", "width": 120 },
+    { "id": "ccu_mix", "lane": "routing", "col": 5, "type": "cloud", "label": "组合类", "sublabel": "Parallel／Concur／Pipeline", "width": 136 },
+    { "id": "ccu_a2a", "lane": "entry", "col": 5, "type": "cloud", "label": "AlltoAll类", "sublabel": "Mesh／UBX并发", "width": 126 }
+  ],
+  "edges": [
+    { "id": "ccu_input_ms", "from": "ccu_input", "to": "ccu_ms_gate", "variant": "default" },
+    { "id": "ccu_ms_pass", "from": "ccu_ms_gate", "to": "ccu_ms_out", "label": "满足", "variant": "emphasis", "role": "main" },
+    { "id": "ccu_ms_fail", "from": "ccu_ms_gate", "to": "ccu_sched_gate", "label": "不满足，自动转SCHED", "variant": "default", "role": "branch" },
+    { "id": "ccu_sched_pass", "from": "ccu_sched_gate", "to": "ccu_shape", "label": "满足", "variant": "emphasis", "role": "main" },
+    { "id": "ccu_sched_fail", "from": "ccu_sched_gate", "to": "ccu_fallback", "label": "不满足", "variant": "security", "role": "error" },
+    { "id": "ccu_shape_mesh", "from": "ccu_shape", "to": "ccu_mesh", "label": "规则Mesh", "variant": "emphasis", "role": "main" },
+    { "id": "ccu_shape_nhr", "from": "ccu_shape", "to": "ccu_nhr", "label": "CLOS／NHR", "variant": "default", "role": "branch" },
+    { "id": "ccu_shape_mix", "from": "ccu_shape", "to": "ccu_mix", "label": "Mesh+CLOS／中大数据", "variant": "default", "role": "branch" },
+    { "id": "ccu_shape_a2a", "from": "ccu_shape", "to": "ccu_a2a", "label": "AlltoAll家族", "variant": "default", "role": "branch" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "CCU_MS前置",
+      "items": ["AR/RS/AG的多层、strict、inplace及部分数据类型会使MS不匹配", "Mesh_1D小规模优先；UBX大数据可能走Mesh+NHR组合"]
+    },
+    {
+      "dot": "violet",
+      "title": "CCU_SCHED主线",
+      "items": ["单层规则Mesh偏Mesh；CLOS或层次退化偏SoleNHR", "混合拓扑按数据量选择Parallel、Concur或Pipeline"]
+    },
+    {
+      "dot": "amber",
+      "title": "AlltoAll例外",
+      "items": ["CCU_MS尚未支持，SCHED只覆盖受限拓扑", "最终多为Mesh/UBX变体，不沿用AR的NHR/RHD分支"]
+    }
+  ]
+}

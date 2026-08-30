@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "HCCL AIV算子选择路线图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1240, 650]
+  },
+  "lanes": [
+    { "id": "entry", "label": "入口与回退" },
+    { "id": "routing", "label": "能力与算子分流" },
+    { "id": "execution", "label": "设备侧执行 Kernel" }
+  ],
+  "phases": [
+    { "id": "mode", "label": "AIV能力门槛", "fromCol": 0, "toCol": 1 },
+    { "id": "shape", "label": "算子与数据", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "result", "label": "设备侧执行", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["aiv_input", "aiv_gate", "aiv_limits", "aiv_op", "aiv_coll"],
+  "nodes": [
+    { "id": "aiv_input", "lane": "entry", "col": 0, "type": "external", "label": "AIV请求", "sublabel": "Op／拓扑／数据／配置", "width": 124 },
+    { "id": "aiv_gate", "lane": "entry", "col": 1, "type": "security", "label": "AIV模式？", "sublabel": "AIV或AIV_ONLY", "width": 132 },
+    { "id": "aiv_limits", "lane": "routing", "col": 2, "type": "security", "label": "能力与资源满足？", "sublabel": "层数／rank／数据／Buffer", "width": 132 },
+    { "id": "aiv_fallback", "lane": "entry", "col": 4, "type": "messagebus", "label": "自动回退", "sublabel": "CCU_FAIL→AI_CPU", "width": 124 },
+    { "id": "aiv_error", "lane": "entry", "col": 5, "type": "messagebus", "label": "AIV_ONLY失败", "sublabel": "报错，不切换引擎", "width": 132 },
+    { "id": "aiv_op", "lane": "routing", "col": 3, "type": "backend", "label": "算子分流", "sublabel": "AR／RS／AG／A2A", "width": 132 },
+    { "id": "aiv_ar", "lane": "execution", "col": 4, "type": "cloud", "label": "AllReduce", "sublabel": "Mesh OneShot／TwoShot", "width": 128 },
+    { "id": "aiv_coll", "lane": "execution", "col": 5, "type": "cloud", "label": "RS／AG／Bcast", "sublabel": "SoleMesh Kernel", "width": 128 },
+    { "id": "aiv_a2a", "lane": "routing", "col": 5, "type": "cloud", "label": "AlltoAll家族", "sublabel": "SoleMesh交换", "width": 128 }
+  ],
+  "edges": [
+    { "id": "aiv_input_gate", "from": "aiv_input", "to": "aiv_gate", "variant": "default" },
+    { "id": "aiv_gate_limits", "from": "aiv_gate", "to": "aiv_limits", "variant": "emphasis", "role": "main" },
+    { "id": "aiv_limits_op", "from": "aiv_limits", "to": "aiv_op", "label": "满足", "variant": "emphasis", "role": "main" },
+    { "id": "aiv_limits_fallback", "from": "aiv_limits", "to": "aiv_fallback", "label": "AIV自动模式不满足", "variant": "security", "role": "error" },
+    { "id": "aiv_limits_error", "from": "aiv_limits", "to": "aiv_error", "label": "AIV_ONLY不满足", "variant": "security", "role": "error" },
+    { "id": "aiv_op_ar", "from": "aiv_op", "to": "aiv_ar", "label": "AR", "variant": "emphasis", "role": "branch" },
+    { "id": "aiv_op_coll", "from": "aiv_op", "to": "aiv_coll", "label": "RS / AG / Bcast", "variant": "default", "role": "main" },
+    { "id": "aiv_op_a2a", "from": "aiv_op", "to": "aiv_a2a", "label": "AlltoAll", "variant": "default", "role": "branch" },
+    { "id": "aiv_op_v", "from": "aiv_op", "to": "aiv_fallback", "label": "AGV / RSV当前不支持AIV", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "硬门槛",
+      "items": ["level2UbRtp或≥3层拓扑不进入AIV", "通常要求rank≤512；A2A V/VC路径上限为256"]
+    },
+    {
+      "dot": "cyan",
+      "title": "数据门槛",
+      "items": ["AR/RS/AG等自动模式受单rank约8MB与CCL Buffer循环上限约束", "AllReduce再按128KB/512KB拐点选OneShot或TwoShot"]
+    },
+    {
+      "dot": "amber",
+      "title": "回退语义",
+      "items": ["AIV自动模式失败后回到AI_CPU", "AIV_ONLY失败直接报错，不悄悄改变用户指定"]
+    }
+  ]
+}
