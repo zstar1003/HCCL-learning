@@ -1,0 +1,169 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "固定选择路线图：AI_CPU常见集合通信",
+    "subtitle": "约束优先，拓扑定路径，数据规模定Executor；完整保留单层、两层、三层分支",
+    "locale": "zh-CN",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "standard",
+    "output": "docs/zh/architecture/hccl-aicpu-selector-one-slide-archify-tree.html",
+    "legend": {
+      "mode": "all",
+      "entries": {
+        "external": { "label": "输入" },
+        "backend": { "label": "判断或Sole出口" },
+        "security": { "label": "高优先级覆盖" },
+        "messagebus": { "label": "并发或流水Executor" },
+        "database": { "label": "Sequence串行Executor" },
+        "cloud": { "label": "UBoE专用多层路径" }
+      }
+    },
+    "views": [
+      {
+        "id": "priority",
+        "label": "先看覆盖条件",
+        "focus": ["input", "priority_gate", "ordered", "special_reduce", "layer_gate"],
+        "note": "strict和特殊归约先于普通拓扑性能规则。"
+      },
+      {
+        "id": "single_level",
+        "label": "单层拓扑",
+        "focus": ["layer_gate", "level0_shape", "mixed_gate", "sole_mesh", "sole_nhr_single", "concur", "parallel_single", "pipeline_single"],
+        "note": "先分全Mesh、CLOS或混合，再看连通性、规则性和数据规模。"
+      },
+      {
+        "id": "two_level",
+        "label": "两层拓扑",
+        "focus": ["layer_gate", "degrade_gate", "level0_two", "data_band", "sole_nhr_two", "parallel_two", "sequence_two"],
+        "note": "有效层次且Level0为规则Mesh时，才进入小、中、超大数据分档。"
+      },
+      {
+        "id": "three_level",
+        "label": "三层拓扑",
+        "focus": ["layer_gate", "symmetry_gate", "uboe_gate", "sole_nhr_three", "uboe_parallel", "sequence_three"],
+        "note": "先检查Level0/1对称性，再判断顶层UBoE能力。"
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "entry", "label": "总入口｜覆盖条件优先" },
+    { "id": "single_decision", "label": "单层｜拓扑形态判断" },
+    { "id": "single_output", "label": "单层｜算法出口" },
+    { "id": "two_decision", "label": "两层｜有效层次与数据档位" },
+    { "id": "two_output", "label": "两层｜算法出口" },
+    { "id": "three_decision", "label": "三层｜对称性与UBoE能力" },
+    { "id": "three_output", "label": "三层｜算法出口" }
+  ],
+  "groups": [
+    { "id": "priority_override", "label": "高优先级覆盖", "lane": "entry", "fromCol": 3, "toCol": 5, "variant": "security" },
+    { "id": "single_family", "label": "Level0常见出口", "lane": "single_output", "fromCol": 1, "toCol": 5, "variant": "emphasis" },
+    { "id": "two_family", "label": "普通两层数据分档", "lane": "two_output", "fromCol": 1, "toCol": 5, "variant": "emphasis" },
+    { "id": "three_family", "label": "多层网络出口", "lane": "three_output", "fromCol": 1, "toCol": 5, "variant": "dashed" }
+  ],
+  "semanticChecks": {
+    "allowedRoots": ["input"],
+    "allowedTerminals": [
+      "ordered",
+      "special_reduce",
+      "sole_mesh",
+      "sole_nhr_single",
+      "concur",
+      "parallel_single",
+      "pipeline_single",
+      "sole_nhr_two",
+      "parallel_two",
+      "sequence_two",
+      "sole_nhr_three",
+      "uboe_parallel",
+      "sequence_three"
+    ],
+    "requiredPaths": [
+      { "from": "input", "to": "ordered" },
+      { "from": "input", "to": "pipeline_single" },
+      { "from": "input", "to": "sequence_two" },
+      { "from": "input", "to": "uboe_parallel" }
+    ]
+  },
+  "nodes": [
+    { "id": "input", "lane": "entry", "col": 0, "type": "external", "label": "输入", "sublabel": "Op · 拓扑 · S · R · 类型 · 约束", "width": 176 },
+    { "id": "priority_gate", "lane": "entry", "col": 1, "type": "backend", "label": "高优先级约束", "sublabel": "先判断覆盖条件", "width": 160 },
+    { "id": "layer_gate", "lane": "entry", "col": 2, "type": "backend", "label": "拓扑层数", "sublabel": "单层 / 两层 / 三层", "width": 152 },
+    { "id": "ordered", "lane": "entry", "col": 4, "type": "security", "label": "Ordered", "sublabel": "Mesh或AlltoAll + NHR", "width": 176 },
+    { "id": "special_reduce", "lane": "entry", "col": 5, "type": "security", "label": "Sole / Sequence", "sublabel": "NHR + AICPU Reduce", "width": 184 },
+
+    { "id": "level0_shape", "lane": "single_decision", "col": 2, "type": "backend", "label": "Level0形态", "sublabel": "全Mesh / CLOS / 混合", "width": 168 },
+    { "id": "mixed_gate", "lane": "single_decision", "col": 3, "type": "backend", "label": "连通性与规则性", "sublabel": "全连 · 规则 · 数据规模", "width": 176 },
+
+    { "id": "sole_mesh", "lane": "single_output", "col": 3, "type": "backend", "label": "Sole｜Mesh", "width": 158, "height": 32, "yOffset": -20 },
+    { "id": "sole_nhr_single", "lane": "single_output", "col": 4, "type": "backend", "label": "Sole｜NHR", "width": 164, "height": 32, "yOffset": -20 },
+    { "id": "concur", "lane": "single_output", "col": 5, "type": "messagebus", "label": "Concur｜Mesh + NHR", "width": 184, "height": 32, "yOffset": -20 },
+    { "id": "parallel_single", "lane": "single_output", "col": 4, "type": "messagebus", "label": "Parallel｜Mesh + NHR", "width": 184, "height": 32, "yOffset": 20 },
+    { "id": "pipeline_single", "lane": "single_output", "col": 5, "type": "messagebus", "label": "Pipeline｜Mesh + NHR", "width": 184, "height": 32, "yOffset": 20 },
+
+    { "id": "degrade_gate", "lane": "two_decision", "col": 2, "type": "backend", "label": "层次退化或本地组为1？", "sublabel": "能否建立有效层次", "width": 196 },
+    { "id": "level0_two", "lane": "two_decision", "col": 3, "type": "backend", "label": "Level0形态", "sublabel": "CLOS / 规则Mesh", "width": 168 },
+    { "id": "data_band", "lane": "two_decision", "col": 4, "type": "backend", "label": "按Op判断数据档位", "sublabel": "小 / 中 / 超大", "width": 176 },
+
+    { "id": "sole_nhr_two", "lane": "two_output", "col": 4, "type": "backend", "label": "Sole｜NHR", "width": 176, "height": 32 },
+    { "id": "parallel_two", "lane": "two_output", "col": 5, "type": "messagebus", "label": "Parallel｜Mesh + NHR", "width": 184, "height": 32, "yOffset": -20 },
+    { "id": "sequence_two", "lane": "two_output", "col": 5, "type": "database", "label": "Sequence｜Mesh + NHR", "width": 184, "height": 32, "yOffset": 20 },
+
+    { "id": "symmetry_gate", "lane": "three_decision", "col": 2, "type": "backend", "label": "Level0 / Level1对称？", "sublabel": "先验证层次规则性", "width": 192 },
+    { "id": "uboe_gate", "lane": "three_decision", "col": 3, "type": "backend", "label": "顶层UBoE且能力满足？", "sublabel": "专用网络能力判断", "width": 192 },
+
+    { "id": "sole_nhr_three", "lane": "three_output", "col": 3, "type": "backend", "label": "Sole｜NHR", "sublabel": "层次不对称时回退", "width": 170 },
+    { "id": "uboe_parallel", "lane": "three_output", "col": 4, "type": "cloud", "label": "Pipeline / UBoE Parallel", "sublabel": "多层Mesh / NHR", "width": 204 },
+    { "id": "sequence_three", "lane": "three_output", "col": 5, "type": "database", "label": "Sequence｜Mesh + NHR + NHR", "sublabel": "无UBoE能力的三层路径", "width": 220 }
+  ],
+  "edges": [
+    { "id": "input_priority", "from": "input", "to": "priority_gate", "variant": "emphasis" },
+    { "id": "priority_ordered", "from": "priority_gate", "to": "ordered", "label": "strict", "variant": "security", "role": "branch", "bias": 0.25 },
+    { "id": "priority_special", "from": "priority_gate", "to": "special_reduce", "label": "特殊归约", "variant": "security", "role": "branch", "bias": 0.75 },
+    { "id": "priority_normal", "from": "priority_gate", "to": "layer_gate", "label": "普通路径", "variant": "emphasis" },
+
+    { "id": "layer_single", "from": "layer_gate", "to": "level0_shape", "label": "单层", "variant": "emphasis", "role": "branch" },
+    { "id": "single_mesh", "from": "level0_shape", "to": "sole_mesh", "label": "全Mesh", "variant": "default", "role": "branch" },
+    { "id": "single_clos", "from": "level0_shape", "to": "sole_nhr_single", "label": "CLOS", "variant": "dashed", "role": "branch" },
+    { "id": "single_mixed", "from": "level0_shape", "to": "mixed_gate", "label": "Mesh + CLOS", "variant": "emphasis" },
+    { "id": "mixed_full", "from": "mixed_gate", "to": "sole_mesh", "label": "Mesh全连", "variant": "default", "role": "branch" },
+    { "id": "mixed_irregular", "from": "mixed_gate", "to": "sole_nhr_single", "label": "关系不规则", "variant": "dashed", "role": "branch" },
+    { "id": "mixed_concur", "from": "mixed_gate", "to": "concur", "label": "规则、小rank", "variant": "emphasis", "role": "branch" },
+    { "id": "mixed_parallel", "from": "mixed_gate", "to": "parallel_single", "label": "非全连、数据不大", "variant": "emphasis", "role": "branch" },
+    { "id": "mixed_pipeline", "from": "mixed_gate", "to": "pipeline_single", "label": "大数据且可流水", "variant": "emphasis", "role": "branch" },
+
+    { "id": "layer_two", "from": "layer_gate", "to": "degrade_gate", "variant": "emphasis", "role": "branch" },
+    { "id": "two_degraded", "from": "degrade_gate", "to": "sole_nhr_two", "label": "是", "variant": "dashed", "role": "branch" },
+    { "id": "two_valid", "from": "degrade_gate", "to": "level0_two", "label": "否", "variant": "emphasis" },
+    { "id": "two_clos", "from": "level0_two", "to": "sole_nhr_two", "label": "CLOS", "variant": "dashed", "role": "branch" },
+    { "id": "two_mesh", "from": "level0_two", "to": "data_band", "label": "规则Mesh", "variant": "emphasis" },
+    { "id": "data_small", "from": "data_band", "to": "sole_nhr_two", "label": "小", "variant": "dashed", "role": "branch" },
+    { "id": "data_medium", "from": "data_band", "to": "parallel_two", "label": "中", "variant": "emphasis", "role": "branch" },
+    { "id": "data_huge", "from": "data_band", "to": "sequence_two", "label": "超大", "variant": "emphasis", "role": "branch" },
+
+    { "id": "layer_three", "from": "layer_gate", "to": "symmetry_gate", "variant": "emphasis", "role": "branch" },
+    { "id": "three_asym", "from": "symmetry_gate", "to": "sole_nhr_three", "label": "否", "variant": "dashed", "role": "branch" },
+    { "id": "three_sym", "from": "symmetry_gate", "to": "uboe_gate", "label": "是", "variant": "emphasis" },
+    { "id": "three_uboe", "from": "uboe_gate", "to": "uboe_parallel", "label": "是", "variant": "emphasis", "role": "branch" },
+    { "id": "three_no_uboe", "from": "uboe_gate", "to": "sequence_three", "label": "否", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "读图方式",
+      "items": [
+        "输出统一写成 Executor｜Template族；Executor负责组织执行，Template负责具体通信步骤",
+        "Sole单路；Parallel阶段并行；Sequence阶段串行；Pipeline切块重叠；Concur多平面并发"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "普通两层数据档位（小→中→超大）",
+      "items": [
+        "AllReduce：S=32MB / S=4GB；ReduceScatter：S=4MB / S×R=4GB",
+        "AllGather：S=1MB / S×R=4GB；产品能力、strict、资源回退和新Selector择优优先"
+      ]
+    }
+  ]
+}
